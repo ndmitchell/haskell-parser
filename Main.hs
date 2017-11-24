@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad.Extra
 import Data.List
@@ -5,6 +6,7 @@ import System.Directory.Extra
 import System.FilePath
 import System.IO
 import System.Process.Extra
+import qualified Data.ByteString.Char8 as BS
 import System.Time.Extra
 
 
@@ -24,7 +26,16 @@ main = do
         forM_ files $ \file -> do
             let out = "out" </> file
             createDirectoryIfMissing True $ takeDirectory out
-            copyFile file out
+            let noImplicitPrelude = "compiler" `elem` splitDirectories file && takeExtension file == ".hs"
+            src <- (if not noImplicitPrelude then id
+                    else BS.append "{-# LANGUAGE NoImplicitPrelude #-}\n") <$>
+                 BS.readFile file
+            b <- doesFileExist out
+            if not b then BS.writeFile out src else do
+                dest <- BS.readFile out
+                when (dest /= src) $
+                    -- avoid needless dirtying of the timestamp
+                    BS.writeFile out src
 
     phase "Copying extra" $ do
         files <- listFiles "extra"
@@ -41,5 +52,6 @@ main = do
     phase "Compiling" $
         withCurrentDirectory "out/ghc/compiler" $ do
             dirs <- filterM doesDirectoryExist =<< listContents ""
-            system_ $ "ghc Parser -XNoImplicitPrelude -DSTAGE=0 -i../libraries/ghc-boot;../libraries/ghc-boot-th;" ++ intercalate ";" dirs ++ " -I."
-            system_ $ "ghc -fobject-code --interactive Parser -XNoImplicitPrelude -DSTAGE=0 -i../libraries/ghc-boot;../libraries/ghc-boot-th;" ++ intercalate ";" dirs ++ " -I."
+            let flags = "-DSTAGE=0 -i../libraries/ghc-boot;../libraries/ghc-boot-th;" ++ intercalate ";" dirs ++ " -I."
+            system_ $ "ghc Parser " ++ flags
+            writeFile ".ghci" $ ":set -fobject-code " ++ flags ++ "\n:load Parser"
