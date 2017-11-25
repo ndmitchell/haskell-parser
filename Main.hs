@@ -52,6 +52,6 @@ main = do
     phase "Compiling" $
         withCurrentDirectory "out/ghc/compiler" $ do
             dirs <- filterM doesDirectoryExist =<< listContents ""
-            let flags = "-DSTAGE=0 -i../libraries/ghc-boot;../libraries/ghc-boot-th;" ++ intercalate ";" dirs ++ " -I."
-            system_ $ "ghc Parser " ++ flags
-            writeFile ".ghci" $ ":set -fobject-code " ++ flags ++ "\n:load Parser"
+            let flags = "-DSTAGE=0 -outputdir=obj -i../../../src;../libraries/ghc-boot;../libraries/ghc-boot-th;" ++ intercalate ";" dirs ++ " -I."
+            system_ $ "ghc Language.Haskell.Parser " ++ flags
+            writeFile ".ghci" $ ":set -fobject-code " ++ flags ++ "\n:load Language.Haskell.Parser"
